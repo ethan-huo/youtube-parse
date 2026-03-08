@@ -2,13 +2,10 @@ import { existsSync } from "fs";
 import { join } from "path";
 
 export const SKILL_DIR = `${import.meta.dir}/..`;
-export const LOCAL_VOX_BIN = join(
-  SKILL_DIR,
-  "..",
-  "ontype-workspace",
-  "vox",
-  "vox",
-);
+export const LOCAL_VOX_BIN_CANDIDATES = [
+  join(SKILL_DIR, "..", "ontype-workspace", "vox", "vox"),
+  join(SKILL_DIR, "..", "..", "ontype-workspace", "vox", "vox"),
+];
 
 export type Requirement = "yt-dlp" | "ffmpeg" | "uvx" | "vox";
 
@@ -52,8 +49,10 @@ export async function resolveVoxBinary(): Promise<string | null> {
     return "vox";
   }
 
-  if (isExecutableFile(LOCAL_VOX_BIN)) {
-    return LOCAL_VOX_BIN;
+  for (const candidate of LOCAL_VOX_BIN_CANDIDATES) {
+    if (isExecutableFile(candidate)) {
+      return candidate;
+    }
   }
 
   return null;

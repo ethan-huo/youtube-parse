@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-LOCAL_VOX_BIN="${REPO_DIR}/../ontype-workspace/vox/vox"
+LOCAL_VOX_BIN_1="${REPO_DIR}/../ontype-workspace/vox/vox"
+LOCAL_VOX_BIN_2="${REPO_DIR}/../../ontype-workspace/vox/vox"
 
 echo "=== YouTube Parse Setup ==="
 echo "Repo: $REPO_DIR"
@@ -52,8 +53,11 @@ if [ -n "${YOUTUBE_PARSE_VOX_BIN:-}" ] && [ -x "${YOUTUBE_PARSE_VOX_BIN}" ]; the
 elif command -v vox &> /dev/null; then
     VOX_BIN="$(command -v vox)"
     echo "✓ vox available at $VOX_BIN"
-elif [ -x "$LOCAL_VOX_BIN" ]; then
-    VOX_BIN="$LOCAL_VOX_BIN"
+elif [ -x "$LOCAL_VOX_BIN_1" ]; then
+    VOX_BIN="$LOCAL_VOX_BIN_1"
+    echo "✓ local vox binary found at $VOX_BIN"
+elif [ -x "$LOCAL_VOX_BIN_2" ]; then
+    VOX_BIN="$LOCAL_VOX_BIN_2"
     echo "✓ local vox binary found at $VOX_BIN"
 elif command -v go &> /dev/null; then
     echo "Installing vox via go install..."
