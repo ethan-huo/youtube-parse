@@ -142,7 +142,7 @@ const subtitleGroup = group(
 
 const transcribeCmd = c
   .meta({
-    description: "Transcribe audio using Whisper",
+    description: "Transcribe audio using vox / DashScope ASR",
     examples: [
       "youtube-parse transcribe audio.wav --lang zh",
       "youtube-parse transcribe audio.wav --lang auto --background",
@@ -173,7 +173,7 @@ const transcribeCmd = c
         format: v.optional(
           v.pipe(
             v.picklist(["srt", "json", "vtt", "all"]),
-            v.description("Output format"),
+            v.description("Output format (.srt/.vtt are single-block wrappers with vox backend)"),
           ),
           "all",
         ),

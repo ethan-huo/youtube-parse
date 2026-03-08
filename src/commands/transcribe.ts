@@ -1,6 +1,7 @@
 import { existsSync } from "fs";
+import { join } from "path";
 
-import { exec, output, fail, getModelPath, requireRequirements } from "../lib";
+import { exec, output, fail, requireRequirements, resolveVoxBinary } from "../lib";
 import type { AppHandlers } from "../lib";
 
 function checkFile(filePath: string): void {
@@ -9,78 +10,114 @@ function checkFile(filePath: string): void {
   }
 }
 
+function wrapAsSrt(text: string): string {
+  return `1\n00:00:00,000 --> 99:59:59,000\n${text.trim()}\n`;
+}
+
+function wrapAsVtt(text: string): string {
+  return `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${text.trim()}\n`;
+}
+
+function shellEscape(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function buildContext(lang: string): string | null {
+  if (lang === "auto") return null;
+  return `Language hint: the audio is primarily in ${lang}.`;
+}
+
 export const transcribeHandler: AppHandlers["transcribe"] = async ({
   input,
 }) => {
-  await requireRequirements(["whisper-cli", "whisper-model"]);
   checkFile(input.audio);
-  const modelPath = getModelPath();
+  await requireRequirements(["vox"]);
+  const voxBin = await resolveVoxBinary();
+  if (!voxBin) {
+    fail(
+      "vox not found. Install vox, or set YOUTUBE_PARSE_VOX_BIN to the binary path.",
+    );
+  }
+
+  const context = buildContext(input.lang);
 
   const args = [
-    "whisper-cli",
-    "-m",
-    modelPath,
+    voxBin,
+    "hear",
     "-f",
     input.audio,
-    "-l",
-    input.lang,
-    "-of",
-    input.output,
   ];
-
-  // Add format flags
-  if (input.format === "all") {
-    args.push("-osrt", "-oj");
-  } else if (input.format === "srt") {
-    args.push("-osrt");
-  } else if (input.format === "json") {
-    args.push("-oj");
-  } else if (input.format === "vtt") {
-    args.push("-ovtt");
+  if (context) {
+    args.push("-c", context);
   }
 
   if (input.background) {
-    // Run in background using nohup
     const logFile = `${input.output}.log`;
-    const bgCmd = ["nohup", ...args, ">", logFile, "2>&1", "&"];
-
-    // Use shell to handle nohup + background
-    const shellCmd = bgCmd.join(" ");
-    await exec(["sh", "-c", shellCmd]);
+    const cliPath = join(import.meta.dir, "..", "cli.ts");
+    const bgArgs = [
+      "bun",
+      cliPath,
+      "transcribe",
+      input.audio,
+      "--lang",
+      input.lang,
+      "--output",
+      input.output,
+      "--format",
+      input.format,
+    ];
+    const cmdline = `${bgArgs.map(shellEscape).join(" ")} > ${shellEscape(logFile)} 2>&1 &`;
+    await exec(["sh", "-c", `nohup ${cmdline}`]);
 
     output({
       message: `Transcription started in background. Log: ${logFile}`,
       hints: [
         `Check progress: tail -f ${logFile}`,
-        `Output files: ${input.output}.srt, ${input.output}.json`,
+        `Output files will be written under ${input.output}.* when the job completes.`,
       ],
     });
     return;
   }
 
-  // Run synchronously
   const result = await exec(args);
-
   if (!result.success) {
     fail(result.stderr || "Transcription failed");
   }
 
-  const outputFiles: string[] = [];
-  if (input.format === "all" || input.format === "srt") {
-    outputFiles.push(`${input.output}.srt`);
+  const text = result.stdout.trim();
+  if (!text) {
+    fail("Transcription returned empty output");
   }
+
+  const outputFiles: string[] = [];
+  if (input.format === "all") {
+    await Bun.write(`${input.output}.txt`, `${text}\n`);
+    outputFiles.push(`${input.output}.txt`);
+  }
+
   if (input.format === "all" || input.format === "json") {
+    await Bun.write(
+      `${input.output}.json`,
+      JSON.stringify({ backend: "vox", text }, null, 2) + "\n",
+    );
     outputFiles.push(`${input.output}.json`);
   }
-  if (input.format === "vtt") {
+
+  if (input.format === "all" || input.format === "srt") {
+    await Bun.write(`${input.output}.srt`, wrapAsSrt(text));
+    outputFiles.push(`${input.output}.srt`);
+  }
+
+  if (input.format === "all" || input.format === "vtt") {
+    await Bun.write(`${input.output}.vtt`, wrapAsVtt(text));
     outputFiles.push(`${input.output}.vtt`);
   }
 
   output({
     message: `Transcription complete. Files: ${outputFiles.join(", ")}`,
     hints: [
-      `Extract timestamps: youtube-parse subtitle timestamp ${input.output}.srt`,
-      "For keyframes, search transcript for visual cue keywords",
+      "vox returns plain transcript text; generated .srt/.vtt files are single-block wrappers.",
+      `Clean transcript: youtube-parse subtitle clean ${input.output}.vtt`,
     ],
   });
 };

@@ -7,11 +7,10 @@ import { schema } from "./schema";
 // Re-export from ensure.ts
 export {
   SKILL_DIR,
-  MODELS_DIR,
-  getModelPath,
   ensureAll,
   ensureRequirements,
   checkAll,
+  resolveVoxBinary,
 } from "./ensure";
 
 import { ensureRequirements, type Requirement } from "./ensure";

@@ -1,33 +1,16 @@
-/**
- * Idempotent dependency checker/installer.
- * Called once at CLI startup.
- */
-
-import { existsSync, mkdirSync } from "fs";
-
-// ============================================================================
-// Paths
-// ============================================================================
+import { existsSync } from "fs";
+import { join } from "path";
 
 export const SKILL_DIR = `${import.meta.dir}/..`;
-export const MODELS_DIR = `${SKILL_DIR}/models`;
-export const DEFAULT_MODEL = "ggml-large-v3-turbo-q5_0.bin";
-export const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${DEFAULT_MODEL}`;
+export const LOCAL_VOX_BIN = join(
+  SKILL_DIR,
+  "..",
+  "ontype-workspace",
+  "vox",
+  "vox",
+);
 
-export type Requirement =
-  | "yt-dlp"
-  | "ffmpeg"
-  | "whisper-cli"
-  | "uvx"
-  | "whisper-model";
-
-export function getModelPath(model?: string): string {
-  return `${MODELS_DIR}/${model ?? DEFAULT_MODEL}`;
-}
-
-// ============================================================================
-// Exec Helpers
-// ============================================================================
+export type Requirement = "yt-dlp" | "ffmpeg" | "uvx" | "vox";
 
 async function exec(
   cmd: string[],
@@ -47,10 +30,6 @@ async function commandExists(cmd: string): Promise<boolean> {
   return (await exec(["which", cmd])).success;
 }
 
-// ============================================================================
-// Installers
-// ============================================================================
-
 async function ensureBrew(pkg: string, cmd?: string): Promise<boolean> {
   const cmdName = cmd ?? pkg;
   if (await commandExists(cmdName)) return true;
@@ -59,28 +38,37 @@ async function ensureBrew(pkg: string, cmd?: string): Promise<boolean> {
   return execLive(["brew", "install", pkg]);
 }
 
-async function ensureModel(): Promise<boolean> {
-  const modelPath = getModelPath();
-  if (existsSync(modelPath)) return true;
-
-  console.log(`Downloading whisper model...`);
-  mkdirSync(MODELS_DIR, { recursive: true });
-
-  return execLive([
-    "curl",
-    "-L",
-    "-C",
-    "-",
-    "--progress-bar",
-    "-o",
-    modelPath,
-    MODEL_URL,
-  ]);
+function isExecutableFile(path: string): boolean {
+  return existsSync(path);
 }
 
-// ============================================================================
-// Main Ensure Function
-// ============================================================================
+export async function resolveVoxBinary(): Promise<string | null> {
+  const override = process.env.YOUTUBE_PARSE_VOX_BIN?.trim();
+  if (override && isExecutableFile(override)) {
+    return override;
+  }
+
+  if (await commandExists("vox")) {
+    return "vox";
+  }
+
+  if (isExecutableFile(LOCAL_VOX_BIN)) {
+    return LOCAL_VOX_BIN;
+  }
+
+  return null;
+}
+
+async function ensureVox(): Promise<boolean> {
+  if ((await resolveVoxBinary()) !== null) return true;
+
+  if (!(await commandExists("go"))) {
+    return false;
+  }
+
+  console.log("Installing vox via go install...");
+  return execLive(["go", "install", "github.com/ontypehq/vox@latest"]);
+}
 
 export type EnsureResult = {
   ok: boolean;
@@ -88,33 +76,16 @@ export type EnsureResult = {
 };
 
 const REQUIREMENT_TO_TOOL: Record<
-  Exclude<Requirement, "whisper-model">,
+  Exclude<Requirement, "vox">,
   { pkg: string; cmd?: string }
 > = {
   "yt-dlp": { pkg: "yt-dlp" },
   ffmpeg: { pkg: "ffmpeg" },
-  "whisper-cli": { pkg: "whisper-cpp", cmd: "whisper-cli" },
   uvx: { pkg: "uv", cmd: "uvx" },
 };
 
-/**
- * Ensure all dependencies are installed.
- * Idempotent - safe to call multiple times.
- *
- * @param install - If true, attempt to install missing deps. If false, just check.
- */
 export async function ensureAll(install = true): Promise<EnsureResult> {
-  const missing: string[] = [];
-
-  // Check brew first
-  if (!(await commandExists("brew"))) {
-    return { ok: false, missing: ["brew (install from https://brew.sh)"] };
-  }
-
-  return ensureRequirements(
-    ["yt-dlp", "ffmpeg", "whisper-cli", "uvx", "whisper-model"],
-    install,
-  );
+  return ensureRequirements(["yt-dlp", "ffmpeg", "uvx", "vox"], install);
 }
 
 export async function ensureRequirements(
@@ -123,22 +94,22 @@ export async function ensureRequirements(
 ): Promise<EnsureResult> {
   const missing: string[] = [];
 
-  if (!(await commandExists("brew"))) {
+  const needsBrew = requirements.some((requirement) => requirement !== "vox");
+  if (needsBrew && !(await commandExists("brew"))) {
     return { ok: false, missing: ["brew (install from https://brew.sh)"] };
   }
 
   for (const requirement of requirements) {
-    if (requirement === "whisper-model") {
-      const modelPath = getModelPath();
-      if (existsSync(modelPath)) continue;
+    if (requirement === "vox") {
+      const voxBin = await resolveVoxBinary();
+      if (voxBin) continue;
 
       if (install) {
-        const ok = await ensureModel();
-        if (!ok) missing.push("whisper-model");
+        const ok = await ensureVox();
+        if (!ok) missing.push("vox");
       } else {
-        missing.push("whisper-model");
+        missing.push("vox");
       }
-
       continue;
     }
 
@@ -157,9 +128,6 @@ export async function ensureRequirements(
   return { ok: missing.length === 0, missing };
 }
 
-/**
- * Quick check if all deps exist (no install).
- */
 export async function checkAll(): Promise<EnsureResult> {
   return ensureAll(false);
 }

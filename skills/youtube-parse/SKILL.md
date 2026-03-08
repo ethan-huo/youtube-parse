@@ -5,6 +5,11 @@ description: YouTube parse toolkit
 
 # YouTube Video Parser
 
+## Transcription Backend
+
+`youtube-parse transcribe` uses `vox hear` for ASR.
+Run `vox auth login dashscope --token <your-api-key>` once before using transcription.
+
 ## CLI
 
 `youtube-parse --schema` -- show all typed commands
