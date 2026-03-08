@@ -34,9 +34,7 @@ export const transcribeHandler: AppHandlers["transcribe"] = async ({
   await requireRequirements(["vox"]);
   const voxBin = await resolveVoxBinary();
   if (!voxBin) {
-    fail(
-      "vox not found. Install vox, or set YOUTUBE_PARSE_VOX_BIN to the binary path.",
-    );
+    fail("vox not found. Install it with: go install github.com/ontypehq/vox@latest");
   }
 
   const context = buildContext(input.lang);

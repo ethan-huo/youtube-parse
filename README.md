@@ -14,10 +14,16 @@ bunx skills add ethan-huo/youtube-parse
 
 ## Dependencies
 
-The CLI expects `yt-dlp`, `ffmpeg`, `uvx`, and `vox` to be available. Bootstrap them with:
+The CLI expects `yt-dlp`, `ffmpeg`, `uvx`, and a global `vox` binary. Bootstrap them with:
 
 ```bash
 ./scripts/setup.sh
+```
+
+If `vox` is missing and `go` is available, `setup.sh` installs it with:
+
+```bash
+go install github.com/ontypehq/vox@latest
 ```
 
 For transcription, `vox` must already be authenticated with DashScope:

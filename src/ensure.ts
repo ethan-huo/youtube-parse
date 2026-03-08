@@ -1,11 +1,4 @@
-import { existsSync } from "fs";
-import { join } from "path";
-
 export const SKILL_DIR = `${import.meta.dir}/..`;
-export const LOCAL_VOX_BIN_CANDIDATES = [
-  join(SKILL_DIR, "..", "ontype-workspace", "vox", "vox"),
-  join(SKILL_DIR, "..", "..", "ontype-workspace", "vox", "vox"),
-];
 
 export type Requirement = "yt-dlp" | "ffmpeg" | "uvx" | "vox";
 
@@ -35,24 +28,9 @@ async function ensureBrew(pkg: string, cmd?: string): Promise<boolean> {
   return execLive(["brew", "install", pkg]);
 }
 
-function isExecutableFile(path: string): boolean {
-  return existsSync(path);
-}
-
 export async function resolveVoxBinary(): Promise<string | null> {
-  const override = process.env.YOUTUBE_PARSE_VOX_BIN?.trim();
-  if (override && isExecutableFile(override)) {
-    return override;
-  }
-
   if (await commandExists("vox")) {
     return "vox";
-  }
-
-  for (const candidate of LOCAL_VOX_BIN_CANDIDATES) {
-    if (isExecutableFile(candidate)) {
-      return candidate;
-    }
   }
 
   return null;

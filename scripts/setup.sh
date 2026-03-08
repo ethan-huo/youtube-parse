@@ -3,8 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-LOCAL_VOX_BIN_1="${REPO_DIR}/../ontype-workspace/vox/vox"
-LOCAL_VOX_BIN_2="${REPO_DIR}/../../ontype-workspace/vox/vox"
 
 echo "=== YouTube Parse Setup ==="
 echo "Repo: $REPO_DIR"
@@ -47,18 +45,9 @@ ensure_brew_pkg uv uvx
 
 echo ""
 echo "[4/4] Checking vox..."
-if [ -n "${YOUTUBE_PARSE_VOX_BIN:-}" ] && [ -x "${YOUTUBE_PARSE_VOX_BIN}" ]; then
-    VOX_BIN="${YOUTUBE_PARSE_VOX_BIN}"
-    echo "✓ using YOUTUBE_PARSE_VOX_BIN=$VOX_BIN"
-elif command -v vox &> /dev/null; then
+if command -v vox &> /dev/null; then
     VOX_BIN="$(command -v vox)"
     echo "✓ vox available at $VOX_BIN"
-elif [ -x "$LOCAL_VOX_BIN_1" ]; then
-    VOX_BIN="$LOCAL_VOX_BIN_1"
-    echo "✓ local vox binary found at $VOX_BIN"
-elif [ -x "$LOCAL_VOX_BIN_2" ]; then
-    VOX_BIN="$LOCAL_VOX_BIN_2"
-    echo "✓ local vox binary found at $VOX_BIN"
 elif command -v go &> /dev/null; then
     echo "Installing vox via go install..."
     go install github.com/ontypehq/vox@latest
@@ -67,13 +56,12 @@ elif command -v go &> /dev/null; then
         echo "✓ vox installed at $VOX_BIN"
     else
         echo "Error: vox installed, but not found in PATH"
-        echo "  Add your Go bin directory to PATH, or set YOUTUBE_PARSE_VOX_BIN"
+        echo "  Add your Go bin directory to PATH"
         exit 1
     fi
 else
     echo "Error: vox not found."
     echo "  Install with: go install github.com/ontypehq/vox@latest"
-    echo "  Or set YOUTUBE_PARSE_VOX_BIN to your local vox binary"
     exit 1
 fi
 
