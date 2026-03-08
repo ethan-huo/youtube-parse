@@ -6,7 +6,7 @@ YouTube parsing CLI plus standalone skill package for subtitle cleanup, transcri
 
 ```bash
 # CLI
-bun install -g github:ethan-huo/youtube-parse
+bun install -g git+https://github.com/ethan-huo/youtube-parse.git
 
 # Skill
 bunx skills add ethan-huo/youtube-parse
